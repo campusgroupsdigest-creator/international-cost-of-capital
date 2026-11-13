@@ -367,8 +367,10 @@ def main():
 
     fetch = st.cache_data(ttl=900, show_spinner=False)(_fetch_source)
     st.title("International Cost of Capital")
-    countries = sorted(pycountry.countries, key=_country_name)
-    us = pycountry.countries.get(alpha_3="USA")
+    countries_by_code = {country.alpha_3: country for country in pycountry.countries}
+    country_names = {code: _country_name(country) for code, country in countries_by_code.items()}
+    country_codes = sorted(country_names, key=country_names.__getitem__)
+    us = countries_by_code["USA"]
     with st.spinner("Loading industry and tax data…"):
         beta_source = fetch("betas", BETAS_HTML)
         tax_source = fetch("tax", OECD_INFO)
@@ -378,11 +380,12 @@ def main():
         industries = sorted(beta_source.values) or [DEFAULT_INDUSTRY]
         default_industry = industries.index(DEFAULT_INDUSTRY) if DEFAULT_INDUSTRY in industries else 0
         industry = st.selectbox("Industry", industries, index=default_industry, key="industry")
-        target = st.selectbox(
-            "Target country", countries, index=countries.index(us),
-            format_func=_country_name, key="target",
+        target_code = st.selectbox(
+            "Target country", country_codes, index=country_codes.index("USA"),
+            format_func=country_names.__getitem__, key="target_country_code",
         )
-        target_name = _country_name(target)
+        target = countries_by_code[target_code]
+        target_name = country_names[target_code]
         erp = st.number_input("Equity risk premium (%)", value=6.50, step=0.25, format="%.2f")
         debt = st.number_input(
             "Target debt share (%)", min_value=0.0, max_value=99.99, value=30.0,
