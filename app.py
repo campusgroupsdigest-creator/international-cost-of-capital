@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from html import escape
 from io import BytesIO, StringIO
 from math import isfinite
+from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 
@@ -225,6 +226,24 @@ def _get_tax_rates():
     if not rates:
         raise ValueError("No statutory tax rates in the OECD response.")
     return rates, dates, OECD_INFO
+
+
+def _tax_observation_url(country_code: str, year: str) -> str:
+    params = {
+        "bp": "true",
+        "df[ag]": "OECD.CTP.TPS",
+        "df[ds]": "dsDisseminateFinalDMZ",
+        "df[id]": "DSD_TAX_CIT@DF_CIT",
+        "df[vs]": "2.0",
+        "dq": f"{country_code}.A..ST..S13...",
+        "ly[cl]": "TIME_PERIOD",
+        "ly[rw]": "REF_AREA",
+        "to[TIME_PERIOD]": "false",
+        "vw": "tb",
+    }
+    if year:
+        params["pd"] = f"{year},{year}"
+    return f"https://data-explorer.oecd.org/vis?{urlencode(params)}"
 
 
 def _get_usd_spread():
@@ -518,7 +537,11 @@ def main():
             if item is not None:
                 value = f"{item:.4%}" if rate else f"{item:.4f}"
                 value += f" · {source.dates.get(key) or 'Source date unavailable'}"
-            st.markdown(f"[{label}]({source.url}) · {value} · Fetch attempted {source.fetched_at}")
+            url = source.url
+            if source is tax_source:
+                url = _tax_observation_url(key, source.dates.get(key, ""))
+                label += " (OECD Data Explorer)"
+            st.markdown(f"[{label}]({url}) · {value} · Fetch attempted {source.fetched_at}")
 
 
 if __name__ == "__main__":
